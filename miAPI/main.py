@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 import asyncio
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets 
 from datetime import date 
@@ -33,8 +33,17 @@ def verificar_Peticion(credentials:HTTPBasicCredentials=Depends(security)):
 class Citas(BaseModel):
     id : int = Field(...,gt=0,description="Identificadir de la cita")
     nombre: str = Field(..., min_length=5,description="Datos del paciente")
-    fecha : date = Field(..., min_length=5,description="Datos del paciente")
+    fecha : date
     motivo: str = Field(...,max_length=100,description="Describir porque sucedio")
+    confirmada: bool = False
+    
+    @validator("fecha")
+    def validar_fecha(cls, value):
+
+        if value <= date.today():
+            raise ValueError("La fecha debe ser posterior a la fecha actual")
+
+        return value
 
 
 @app.get("/", tags=["Inicio"])
@@ -81,3 +90,20 @@ async def eliminarCitas(id:int, usuario_Auth:str= Depends(verificar_Peticion)):
         detail="La cita no existe"
     )
     
+@app.put("/v1/citas/confirmar/{id}", tags=["CONFIRMACION"])
+async def confirmarCita(id: int):
+
+    for cita in citas:
+
+        if cita["id"] == id:
+
+            cita["confirmada"] = True
+
+            return {
+                "mensaje": "Cita confirmada",
+                "cita": cita
+            }
+
+    raise HTTPException(
+        status_code=404,
+        detail="Cita no encontrada")
